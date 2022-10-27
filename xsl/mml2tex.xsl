@@ -13,7 +13,7 @@
   version="2.0">
 
   <xsl:import href="function-names.xsl"/>
-  <xsl:import href="http://transpect.io/xslt-util/colors/xsl/colors.xsl"/>
+  <xsl:import href="colors.xsl"/>
 
   <xsl:output method="text" encoding="UTF-8"/>
   
