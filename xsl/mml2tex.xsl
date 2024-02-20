@@ -42,7 +42,9 @@
 
   <xsl:variable name="diacritics-regex" select="'^[&#x60;&#xA8;&#xB4;&#xb8;&#x2c6;&#x2c7;&#x2d8;-&#x2dd;&#x300;-&#x338;&#x20d3;-&#x20ef;]$'" as="xs:string"/>
   
-  <xsl:variable name="parenthesis-regex" select="'[\[\]\(\){}&#x2308;&#x2309;&#x230a;&#x230b;&#x2329;&#x232a;&#x27e8;&#x27e9;&#x3008;&#x3009;]'" as="xs:string"/>
+  <xsl:variable name="parenthesis-regex" select="'[\[\]\(\){}&#x2308;&#x2309;&#x230a;&#x230b;&#x2329;&#x232a;&#x27e6;-&#x27ef;&#x3008;-&#x3011;&#x3014;-&#x301b;&#x7c;]'" as="xs:string"/>
+  
+  <xsl:variable name="left-parenthesis-regex" select="'[\[\({&#x2308;&#x230a;&#x2329;&#x27e8;&#x3008;]'" as="xs:string"/>
 
   <xsl:variable name="whitespace-regex" select="'\p{Zs}&#x200b;-&#x200f;'" as="xs:string"/>
    
@@ -118,7 +120,6 @@
                       |@linebreak
                       |@symmetric[parent::mo]
                       |@columnspacing
-                      |@rowspacing
                       |@columnalign
                       |@groupalign
                       |@columnwidth
@@ -142,7 +143,7 @@
     <xsl:message select="'[WARNING]: element', name(), 'ignored!'"/>
   </xsl:template>
   
-  <!-- https://github.com/transpect/mml2tex/issues/3 -->
+  <!-- https://github.com/transpect/mml2tex/issues/ -->
   
   <xsl:template match="malignmark|maligngroup[position() ne 1]" mode="mathml2tex">
     <!-- consider that the stylesheet which imports mm2ltex.xsl must 
@@ -380,6 +381,7 @@
     <xsl:if test="count(*) ne 3">
       <xsl:message terminate="{$fail-on-error}" select="name(), 'must include three elements', 'context:&#xa;', ancestor::math[1]"/>
     </xsl:if>
+    <xsl:if test="parent::msub | parent::msup | parent::mrow/(parent::msub, parent::msup)">{</xsl:if>
     <xsl:variable name="base">
       <xsl:if test="not($create-limits)">
         <xsl:text>{</xsl:text>
@@ -404,13 +406,14 @@
     <xsl:text>}^{</xsl:text>
     <xsl:apply-templates select="*[3]" mode="#current"/>
     <xsl:text>}</xsl:text>
+    <xsl:if test="parent::msub | parent::msup | parent::mrow/(parent::msub, parent::msup)">}</xsl:if>
   </xsl:template>
 
   <xsl:template match="mtable" mode="mathml2tex">
     <xsl:variable name="mcc" select="mml2tex:max-col-count(.)" as="xs:integer"/>
     <xsl:variable name="columnlines" select="tokenize(@columnlines, '\s')" as="xs:string*"/>
     <xsl:variable name="max-col-count" as="xs:integer"
-                  select="max(for $i in .//mtr return count($i/mtd))"/>
+                  select="max(for $i in mtr return count($i/mtd))"/>
     <xsl:variable name="col-aligns" as="xs:string*"
                   select="for $i in mtr[count(mtd) eq $max-col-count][1]/mtd
                           return ($i/ancestor-or-self::*[@columnalign][1]/@columnalign, 
@@ -450,6 +453,9 @@
     <xsl:apply-templates select="@*, node()" mode="#current"/>
     <xsl:if test="following-sibling::mtr">
       <xsl:text>\\</xsl:text>
+      <xsl:if test="parent::mtable/@rowspacing[not(matches(.,'%'))] ">
+        <xsl:value-of select="concat('[', parent::mtable/@rowspacing,']')"/>
+      </xsl:if>
     </xsl:if>
     <xsl:choose>
       <xsl:when test="$rowlines[$position] = 'solid'">
@@ -622,33 +628,49 @@
   <xsl:template match="*[local-name() = ('mover', 'munder')][not((@accent, @accentunder) = 'true')][* = ('&#x2190;', '&#x20d6;')]/*" mode="mathml2tex-accent-pre" priority="0.5">
     <xsl:text>\xleftarrow</xsl:text>
   </xsl:template>
-  <xsl:template match="mover[@accent eq 'true'][*[2][. = ('&#x2190;', '&#x20d6;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
-    <xsl:text>\overleftarrow</xsl:text>
-  </xsl:template>
-  <xsl:template match="munder[@accentunder eq 'true'][*[2][. = ('&#x2190;', '&#x20d6;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
-    <xsl:text>\underleftarrow</xsl:text>
-  </xsl:template>
-  <xsl:template match="mover[@accent eq 'true'][string-length(*[1]) eq 1][* = ('&#x2192;', '&#x20d7;')]/*" mode="mathml2tex-accent-pre" priority="0.7">
-    <xsl:text>\vec</xsl:text>
-  </xsl:template>
-  <xsl:template match="*[local-name() = ('mover', 'munder')][not((@accent, @accentunder) = 'true')]
-                        [*[. = ('&#x2192;', '&#x20d7;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
+  <xsl:template match="*[local-name() = ('mover', 'munder')][not((@accent, @accentunder) = 'true')][* = ('&#x2192;', '&#x20d7;')]/*" mode="mathml2tex-accent-pre" priority="0.5">
     <xsl:text>\xrightarrow</xsl:text>
   </xsl:template>
-  <xsl:template match="mover[@accent eq 'true'][*[2][. = ('&#x2192;', '&#x20d7;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
+  <xsl:template match="munder[not(@accentunder eq 'true')][*[1] = ('&#x2190;', '&#x20d6;', '&#x2192;', '&#x20d7;', '&#x2194;', '&#x20e1;', '&#x21d0;', '&#x21d2;', '&#x21d4;', '&#x20d0;', '&#x20d1;', '&#x21cb;', '&#x21cc;')]/*
+                      |mover[not(@accent eq 'true')][*[2] = ('&#x2190;', '&#x20d6;', '&#x2194;', '&#x20e1;', '&#x21d0;', '&#x21d2;', '&#x21d4;', '&#x20d0;', '&#x20d1;', '&#x21cb;', '&#x21cc;')]/*
+                      |mover[not(@accent eq 'true')][*[2] = ('&#x2192;', '&#x20d7;')][string-length(*[1]) eq 1]/*" mode="mathml2tex-accent-expression" priority="0.5">
+    <xsl:text>[</xsl:text>
+    <xsl:apply-templates/>
+    <xsl:text>]</xsl:text>
+  </xsl:template>
+  <xsl:template match="munder[not(@accentunder eq 'true')][*[1] = ('&#x2190;', '&#x20d6;', '&#x2192;', '&#x20d7;', '&#x2194;', '&#x20e1;', '&#x21d0;', '&#x21d2;', '&#x21d4;', '&#x20d0;', '&#x20d1;', '&#x21cb;', '&#x21cc;')]/*
+    |mover[not(@accent eq 'true')][*[2] = ('&#x2190;', '&#x20d6;', '&#x2194;', '&#x20e1;', '&#x21d0;', '&#x21d2;', '&#x21d4;', '&#x20d0;', '&#x20d1;', '&#x21cb;', '&#x21cc;')]/*" mode="mathml2tex-accent-post" priority="0.5">
+    <xsl:text>{}</xsl:text>
+  </xsl:template>
+  <xsl:template match="mover[@accent eq 'true'][string-length(*[1]) eq 1][*[2] = ('&#x2192;', '&#x20d7;')]/*" mode="mathml2tex-accent-pre" priority="0.7">
+    <xsl:text>\vec</xsl:text>
+  </xsl:template>
+  <xsl:template match="mover[@accent eq 'true'][*[2][. = ('&#x2192;', '&#x20d7;')]]/*
+                      |munder[@accentunder eq 'true'][*[1][. = ('&#x2192;', '&#x20d7;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
     <xsl:text>\overrightarrow</xsl:text>
   </xsl:template>
-  <xsl:template match="munder[@accentunder eq 'true'][*[2][. = ('&#x2192;', '&#x20d7;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
+  <xsl:template match="mover[@accent eq 'true'][*[1][. = ('&#x2192;', '&#x20d7;')]]/*
+                      |munder[@accentunder eq 'true'][*[2][. = ('&#x2192;', '&#x20d7;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
     <xsl:text>\underrightarrow</xsl:text>
+  </xsl:template>
+  <xsl:template match="mover[@accent eq 'true'][*[2][. = ('&#x2190;', '&#x20d6;')]]/*
+                      |munder[@accentunder eq 'true'][*[1][. = ('&#x2190;', '&#x206d;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
+    <xsl:text>\overleftarrow</xsl:text>
+  </xsl:template>
+  <xsl:template match="mover[@accent eq 'true'][*[1][. = ('&#x2190;', '&#x20d6;')]]/*
+                      |munder[@accentunder eq 'true'][*[2][. = ('&#x2190;', '&#x20d6;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
+    <xsl:text>\underleftarrow</xsl:text>
+  </xsl:template>
+  <xsl:template match="mover[@accent eq 'true'][*[2][. = ('&#x2194;', '&#x20e1;')]]/*
+                      |munder[@accentunder eq 'true'][*[1][. = ('&#x2194;', '&#x20e1;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
+    <xsl:text>\overleftrightarrow</xsl:text>
+  </xsl:template>
+  <xsl:template match="mover[@accent eq 'true'][*[1][. = ('&#x2194;', '&#x20e1;')]]/*
+                      |munder[@accentunder eq 'true'][*[2][. = ('&#x2194;', '&#x20e1;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
+    <xsl:text>\underleftrightarrow</xsl:text>
   </xsl:template>
   <xsl:template match="*[local-name() = ('mover', 'munder')][not((@accent, @accentunder) = 'true')][* = ('&#x2194;', '&#x20e1;')]/*" mode="mathml2tex-accent-pre" priority="0.5">
     <xsl:text>\xleftrightarrow</xsl:text>
-  </xsl:template>
-  <xsl:template match="mover[@accent eq 'true'][*[2][. = ('&#x2194;', '&#x20e1;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
-    <xsl:text>\overleftrightarrow</xsl:text>
-  </xsl:template>
-  <xsl:template match="munder[@accentunder eq 'true'][*[2][. = ('&#x2194;', '&#x20e1;')]]/*" mode="mathml2tex-accent-pre" priority="0.5">
-    <xsl:text>\underleftrightarrow</xsl:text>
   </xsl:template>
   <xsl:template match="*[local-name() = ('mover', 'munder')][not((@accent, @accentunder) = 'true')][* = '&#x21d0;']/*" mode="mathml2tex-accent-pre" priority="0.5">
     <xsl:text>\xLeftarrow</xsl:text>
@@ -666,7 +688,7 @@
     <xsl:text>\xrightharpoonup</xsl:text>
   </xsl:template>
   <xsl:template match="*[local-name() = ('mover', 'munder')][not((@accent, @accentunder) = 'true')][* = '&#x21cb;']/*" mode="mathml2tex-accent-pre" priority="0.5">
-    <xsl:text>\xleftrightharpons</xsl:text>
+    <xsl:text>\xleftrightharpoons</xsl:text>
   </xsl:template>
   <xsl:template match="*[local-name() = ('mover', 'munder')][not((@accent, @accentunder) = 'true')][* = '&#x21cc;']/*" mode="mathml2tex-accent-pre" priority="0.5">
     <xsl:text>\xrightleftharpoons</xsl:text>
@@ -820,15 +842,41 @@
                                                                                     'munderover')]" 
                 mode="mathml2tex" priority="10">
     <xsl:call-template name="fence">
-      <xsl:with-param name="pos" select="if(matches(., '[\[\({&#x2308;&#x230a;&#x2329;&#x27e8;&#x3009;]')) 
-                                         then 'left' 
-                                         else 'right'"/>
+      <xsl:with-param name="pos" 
+                      select="if(matches(., '[\[\({&#x2308;&#x230a;&#x2329;&#x232a;&#x27e7;&#x27e8;&#x27ea;&#x27ec;&#x27ee;&#x3008;&#x300a;&#x300c;&#x300e;&#x3010;&#x3014;&#x3016;&#x3018;&#x301a;]')) 
+                                then 'left'
+                              else if(matches(., '&#x7c;') and parent::mo/parent::mfenced)
+                                then 'middle'
+                              else   'right'"/>
+      <xsl:with-param name="val" select="."/>
+    </xsl:call-template>
+  </xsl:template>
+  
+  <xsl:template match="mo[not(node())]
+                                [not($katex = 'yes')]
+                                [ancestor::*[position() = (2,3)]//*/local-name() = ('mfrac', 
+                                                                                    'mover', 
+                                                                                    'mroot', 
+                                                                                    'msqrt',                                                                                    
+                                                                                    'mtable', 
+                                                                                    'munder',
+                                                                                    'mrow',
+                                                                                    'munderover')]" 
+                mode="mathml2tex" priority="20">
+    <xsl:next-match/>
+    <xsl:call-template name="fence">
+      <xsl:with-param name="pos" select="if (following-sibling::mo) then 'left' else 'right'"/>
       <xsl:with-param name="val" select="."/>
     </xsl:call-template>
   </xsl:template>
   
   <xsl:template match="text()[. = $mml2tex:function-names]" mode="mathml2tex" priority="10">
     <xsl:value-of select="concat('\', replace(normalize-space(.), '&#xa;+', ' '), '&#x20;')"/>
+  </xsl:template>
+  
+  <xsl:template match="text()[. = $mml2tex:function-names]
+                             [. = 'min' and ancestor::*[2]/local-name() = ('msup')]" mode="mathml2tex" priority="11">
+    <xsl:value-of select="concat('\text{', replace(normalize-space(.), '&#xa;+', ' '), '}')"/>
   </xsl:template>
   
   <xsl:template match="text()[$use-upgreek-map] 
@@ -843,7 +891,8 @@
                   select="if(. = ' ') then '\ ' else if(matches($text, $texregex-upgreek)) 
                                                      then string-join(mml2tex:utf2tex($text, $texmap-upgreek, $texregex-upgreek, ..), '')
                                                      else $text" as="xs:string"/>
-      <xsl:value-of select="$utf2tex-upgreek"/>
+    <xsl:value-of select="if (parent::mtext) 
+        then concat('\text{',$utf2tex-upgreek,'}') else $utf2tex-upgreek"/>
   </xsl:template>
   
   <xsl:template match="mn/text()
@@ -851,6 +900,10 @@
                       |mo/text()
                       |ms/text()" mode="mathml2tex" priority="5">
     <xsl:variable name="text" select="replace(normalize-space(.), '&#xa;+', ' ')" as="xs:string"/>
+    <xsl:if test="parent::mo[@stretchy eq 'true'] and matches(., $parenthesis-regex)">
+      <xsl:value-of select="if(matches(., $left-parenthesis-regex)  or (matches(.,'&#x7c;') and not(parent::mo/preceding-sibling::mo[@stretchy='true'][matches(.,'&#x7c;')])))
+                            then '\left' else '\right'"/>
+    </xsl:if>
     <xsl:variable name="utf2tex" select="string-join(mml2tex:utf2tex($text, (), (), ..), '')" as="xs:string"/>
     <xsl:value-of select="$utf2tex"/>
   </xsl:template>
